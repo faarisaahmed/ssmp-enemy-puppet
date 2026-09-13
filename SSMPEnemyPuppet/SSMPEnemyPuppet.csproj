@@ -1,0 +1,93 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>netstandard2.1</TargetFramework>
+        <LangVersion>latest</LangVersion>
+        <Nullable>disable</Nullable>
+        <AssemblyName>SSMPEnemyPuppet</AssemblyName>
+        <RootNamespace>SSMPEnemyPuppet</RootNamespace>
+        <Version>0.1.0</Version>
+        <NoWarn>$(NoWarn);CS0168</NoWarn>
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    </PropertyGroup>
+
+    <!--
+    Override GameDir on the command line to build against a different install:
+        dotnet build -p:GameDir=/path/to/Hollow Knight Silksong
+    -->
+    <PropertyGroup>
+        <GameDir Condition="'$(GameDir)' == ''">$(HOME)/Downloads/Silksong.app/Contents/SharedSupport/prefix/drive_c/GOG Games/Hollow Knight Silksong</GameDir>
+        <ManagedDir>$(GameDir)/Hollow Knight Silksong_Data/Managed</ManagedDir>
+        <BepInExDir>$(GameDir)/BepInEx</BepInExDir>
+        <SsmpDir>$(BepInExDir)/plugins/ssmp-fixed</SsmpDir>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <!-- SSMP: only its public addon API is bound at compile time. -->
+        <Reference Include="SSMP">
+            <HintPath>$(SsmpDir)/SSMP.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+
+        <!--
+        The Enemy Behavior API supplies the discovered attack and movement states this addon
+        drives. Found under plugins/ rather than at a fixed path, since BepInEx scans
+        recursively and people group mods into subfolders.
+        -->
+        <Reference Include="EnemyBehaviorApi">
+            <HintPath>$(EnemyBehaviorApiPath)</HintPath>
+            <Private>false</Private>
+        </Reference>
+
+        <Reference Include="Assembly-CSharp">
+            <HintPath>$(ManagedDir)/Assembly-CSharp.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="PlayMaker">
+            <HintPath>$(ManagedDir)/PlayMaker.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="UnityEngine">
+            <HintPath>$(ManagedDir)/UnityEngine.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="UnityEngine.CoreModule">
+            <HintPath>$(ManagedDir)/UnityEngine.CoreModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="UnityEngine.IMGUIModule">
+            <HintPath>$(ManagedDir)/UnityEngine.IMGUIModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="UnityEngine.InputLegacyModule">
+            <HintPath>$(ManagedDir)/UnityEngine.InputLegacyModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+        <Reference Include="UnityEngine.Physics2DModule">
+            <HintPath>$(ManagedDir)/UnityEngine.Physics2DModule.dll</HintPath>
+            <Private>false</Private>
+        </Reference>
+    </ItemGroup>
+
+    <PropertyGroup>
+        <_ApiFlat>$(BepInExDir)/plugins/EnemyBehaviorApi/EnemyBehaviorApi.dll</_ApiFlat>
+        <_ApiBackend>$(BepInExDir)/plugins/Backend/EnemyBehaviorAPI/EnemyBehaviorApi/EnemyBehaviorApi.dll</_ApiBackend>
+        <EnemyBehaviorApiPath Condition="'$(EnemyBehaviorApiPath)' == '' AND Exists('$(_ApiBackend)')">$(_ApiBackend)</EnemyBehaviorApiPath>
+        <EnemyBehaviorApiPath Condition="'$(EnemyBehaviorApiPath)' == '' AND Exists('$(_ApiFlat)')">$(_ApiFlat)</EnemyBehaviorApiPath>
+    </PropertyGroup>
+
+    <Target Name="CheckApiReference" BeforeTargets="ResolveAssemblyReferences"
+            Condition="'$(EnemyBehaviorApiPath)' == '' Or !Exists('$(EnemyBehaviorApiPath)')">
+        <Error Text="EnemyBehaviorApi.dll not found. Install the Enemy Behavior API, or pass -p:EnemyBehaviorApiPath=/full/path/to/EnemyBehaviorApi.dll" />
+    </Target>
+
+    <!--
+    Deploy next to SSMP.dll. SSMP's AddonLoader only scans the directory its own assembly sits
+    in, so the addon is silently never discovered from anywhere else.
+    -->
+    <Target Name="DeployAddon" AfterTargets="Build" Condition="'$(NoDeploy)' != 'true'">
+        <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SsmpDir)/" ContinueOnError="true"/>
+        <Message Importance="high" Text="Deployed $(TargetFileName) -> $(SsmpDir)/"/>
+    </Target>
+
+</Project>
